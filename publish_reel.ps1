@@ -5,6 +5,8 @@
 #   ads\ad__<Assembly>__<name>.jpg   an ad, shown to players who do NOT have that mod yet
 #   pics\<Assembly>__<name>.jpg      a loading picture, shown to players who DO have that mod
 #   pics\all__<name>.jpg             a loading picture everyone sees
+#   cards\card__<Assembly>__main.jpg  the same card marked IN YOUR GAME, for players who DO have that mod (v4 reel)
+#   $First (below): these open the slideshow every time, in this order (lineup, then the big mods)
 #   tips\<Assembly>.txt              loading tips for that mod, one per line (all.txt = everyone)
 #   news\news__<name>.jpg            an ANNOUNCEMENT everyone sees: it opens the loading slideshow and comes back
 #   news\news__<name>__until-YYYY-MM-DD.jpg   ...and stops showing after that date
@@ -17,8 +19,8 @@
 #         powershell -ExecutionPolicy Bypass -File .\publish_reel.ps1 -NoPush    (build only)
 param(
     [double]$AdSeconds = 8,     # how long an ad stays on screen
-    [int]$AdEvery = 5,          # one ad, then (AdEvery - 1) pictures
-    [double]$OurShare = 0.25,   # share of picture slots that use our pictures (the rest are the game's / other mods')
+    [int]$AdEvery = 3,          # one card/ad, then (AdEvery - 1) pictures (Oct 13 2026: a card every 3rd slide)
+    [double]$OurShare = 0.15,   # share of picture slots that use our pictures (the rest are the game's / other mods')
     # Mix target (Oct 2026): 40% ours / 60% other mods. With ads on: 1/5 ads + 4/5 x 0.25 pictures = 0.40.
     [double]$NewsSeconds = 8,   # how long an announcement stays on screen
     [int]$NewsShows = 3,        # how many times each announcement plays per loading screen
@@ -40,19 +42,32 @@ $out.Add("`tourShare = $OurShare")
 $out.Add("`tnewsSeconds = $NewsSeconds")
 $out.Add("`tnewsShows = $NewsShows")
 $n = 0
+# v4: the slideshow opens with these, in order (a mod name = its card for owners, its ad for everyone else)
+$First = @{ "all__lineup.jpg" = 1; "KerbalDyson" = 2; "KerbalJumpGate" = 3; "KerbalBrains" = 4; "KerbalBrainy" = 5; "IronRoot" = 6 }
+function FirstOf($key) { if ($First.ContainsKey($key)) { "`t`tfirst = $($First[$key])" } }
 
 foreach ($f in Get-ChildItem ads -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png)$' }) {
     if ((Bad $f.Name) -or $f.BaseName -notmatch '^ad__([A-Za-z0-9]+)(__|$)') { Write-Warning "skipped $($f.Name) (name it ad__<Assembly>__<name>.jpg)"; continue }
     $out.Add("`tITEM"); $out.Add("`t{")
     $out.Add("`t`tfile = ads/$($f.Name)"); $out.Add("`t`tkind = ad"); $out.Add("`t`tmod = $($Matches[1])"); $out.Add("`t`trev = $(Rev $f.FullName)")
+    $fl = FirstOf $Matches[1]; if ($fl) { $out.Add($fl) }
     $out.Add("`t}"); $n++
     if ($f.Length -gt 1.5MB) { Write-Warning "$($f.Name) is $([math]::Round($f.Length/1MB,1)) MB, try to keep pictures under 1 MB" }
+}
+foreach ($f in Get-ChildItem cards -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png)$' }) {
+    if ((Bad $f.Name) -or $f.BaseName -notmatch '^card__([A-Za-z0-9]+)(__|$)') { Write-Warning "skipped $($f.Name) (name it card__<Assembly>__<name>.jpg)"; continue }
+    $mod = $Matches[1]
+    $out.Add("`tITEM"); $out.Add("`t{")
+    $out.Add("`t`tfile = cards/$($f.Name)"); $out.Add("`t`tkind = card"); $out.Add("`t`tmod = $mod"); $out.Add("`t`trev = $(Rev $f.FullName)")
+    $fl = FirstOf $mod; if ($fl) { $out.Add($fl) }
+    $out.Add("`t}"); $n++
 }
 foreach ($f in Get-ChildItem pics -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -match '^\.(jpg|jpeg|png)$' }) {
     if ((Bad $f.Name) -or $f.BaseName -notmatch '^([A-Za-z0-9]+)__') { Write-Warning "skipped $($f.Name) (name it <Assembly>__<name>.jpg or all__<name>.jpg)"; continue }
     $mod = if ($Matches[1] -eq "all") { "*" } else { $Matches[1] }
     $out.Add("`tITEM"); $out.Add("`t{")
     $out.Add("`t`tfile = pics/$($f.Name)"); $out.Add("`t`tkind = pic"); $out.Add("`t`tmod = $mod"); $out.Add("`t`trev = $(Rev $f.FullName)")
+    $fl = FirstOf $f.Name; if ($fl) { $out.Add($fl) }
     $out.Add("`t}"); $n++
 }
 $news = 0

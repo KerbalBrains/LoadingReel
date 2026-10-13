@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ART, BADGES, FONT, OUT = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], Path(sys.argv[4])
+MODE = sys.argv[5] if len(sys.argv) > 5 else "ad"   # "ad" = YOU DON'T HAVE THIS ONE YET! (non-owners), "card" = IN YOUR GAME (owners)
 W, H = 1920, 1080
 ORANGE = (255, 140, 40); CYAN = (34, 229, 255)
 
@@ -33,6 +34,9 @@ ADS = [
     dict(asm="KerbalCritters", art=5, name=["KERBAL ", "CRITTERS"], c=((120, 255, 140), (34, 229, 255)),
          tag="Every world has a creature waiting",
          perks=["8 critters to discover on 8 worlds", "Fill your Creature Book", "Critters roam near your lander"]),
+    dict(asm="KerbalBrainy", art=7, name=["", "BRAINY"], c=((255, 90, 200), (34, 229, 255)),
+         tag="The Gate Navigator",
+         perks=["Guides your crew through the Jump Gates", "Flies the ship, no pilot needed", "Leads the way to the Dyson sphere"]),
     dict(asm="KerbalDyson", art=6, name=["KERBAL ", "DYSON"], c=((255, 106, 31), (255, 199, 77)),
          tag="A star wrapped in a sleeping Dyson sphere",
          perks=["A new star, a new planet, a walk-in station", "Wake the sphere and watch it light up",
@@ -107,15 +111,19 @@ def build(ad):
 
     # ribbon
     rf = font(30, "Bold")
-    rtxt = "YOU DON'T HAVE THIS ONE YET!"
+    rtxt = "YOU DON'T HAVE THIS ONE YET!" if MODE == "ad" else "IN YOUR GAME"
     rb = d.textbbox((0, 0), rtxt, font=rf)
-    rw, rh = rb[2] - rb[0] + 56, 58
+    rw, rh = rb[2] - rb[0] + 56 + (52 if MODE == "card" else 0), 58
     pill = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
     pm = Image.new("L", (rw * 4, rh * 4), 0); ImageDraw.Draw(pm).rounded_rectangle([0, 0, rw * 4 - 1, rh * 4 - 1], radius=rh * 2, fill=255)
-    pill.paste(gradient_fill((rw, rh), (255, 120, 30), (255, 190, 60)), (0, 0), pm.resize((rw, rh), Image.LANCZOS))
+    pc = ((255, 120, 30), (255, 190, 60)) if MODE == "ad" else ((40, 200, 110), (120, 255, 160))
+    pill.paste(gradient_fill((rw, rh), *pc), (0, 0), pm.resize((rw, rh), Image.LANCZOS))
     im.alpha_composite(pill, (X, 92))
     d = ImageDraw.Draw(im)
     d.text((X + 28, 92 + (rh - (rb[3] - rb[1])) // 2 - rb[1]), rtxt, font=rf, fill=(20, 12, 4))
+    if MODE == "card":   # drawn check mark after the words (Orbitron has no check glyph)
+        ccx, ccy = X + rw - 40, 92 + rh // 2
+        d.line([(ccx - 12, ccy + 1), (ccx - 3, ccy + 11), (ccx + 14, ccy - 10)], fill=(8, 40, 20), width=7, joint="curve")
 
     # badge + name
     bs = 210
@@ -175,7 +183,8 @@ def build(ad):
     d = ImageDraw.Draw(im)
     d.text((X + 40, cy0 + (ch - (cb[3] - cb[1])) // 2 - cb[1]), ctxt, font=cf, fill=(74, 13, 42))
 
-    im.convert("RGB").save(OUT / f"ad__{ad['asm']}__main.jpg", quality=88, optimize=True)
+    pre = "ad" if MODE == "ad" else "card"
+    im.convert("RGB").save(OUT / f"{pre}__{ad['asm']}__main.jpg", quality=88, optimize=True)
 
 
 if __name__ == "__main__":
